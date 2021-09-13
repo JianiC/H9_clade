@@ -41,7 +41,7 @@ p%<+% meta_G1 +
   scale_color_brewer(palette = "Set3",name="G1 annotation") 
 ```
 
-# With the assigned clade, calulate the maximal pair-wise node distance within clade
+# Calulate the maximal pair-wise node distance within the assigned clades
 
 ```{r, echo=FALSE, warning=FALSE,message=FALSE}
 max_inclade<-function(tree,node){
@@ -73,8 +73,7 @@ data.frame("clade"=c("G1-A","G1-B","G1-C","G1-D","G1-E","G1-F","G1-G","G1-H","G1
 
 ```
 
-
-You can also embed plots, for example:
+# Simulation for G1-clade
 
 ```{r, echo=FALSE,results='hide', warning=FALSE,message=FALSE}
 ## test to perform genotype assignment with node distance
@@ -121,7 +120,7 @@ ggplot(G1_simout,aes(x=G1_simout$X0.001,y=G1_simout$X807))+
   ylab("Number of clades to be assign")
 ```
 
-## I re-assign the clade with maximal pair-wise node distance 0.16 within clade
+## I re-assign the clades with maximal pair-wise node distance within clade as 0.16 subs/site
 ## Similar resultes from the clades defined in annotation file
 ### G1-D clade, small propotion of sequences was unable to classified with this approach ( type 8, green) 
 
@@ -191,7 +190,8 @@ p%<+% G1_tip +
   scale_color_brewer(palette = "Set3",name="G1 annotation with pair-wise node distance") 
 
 ```
-# analysis for KOR clade
+
+# Analysis for KOR clade
 # Kor clades defined from annotation files
 
 ```{r, warning=FALSE,echo=FALSE}
@@ -208,7 +208,7 @@ p%<+% meta_kor +
   scale_color_brewer(palette = "Set3",name="Kor annotation") 
 ```
 
-# With the assigned clade, calulate the maximal pair-wise node distance within clade
+# Calulate the maximal pair-wise node distance within the assigned clades
 
 ```{r, echo=FALSE, warning=FALSE,message=FALSE}
 max_inclade<-function(tree,node){
@@ -237,7 +237,7 @@ data.frame("clade"=c("KOR-A","KOR-B","KOR-C","KOR-D","KOR-E","KOR-F","KOR-G","KO
                                                max_inclade(kor,1097),max_inclade(kor,1110)))
 ```
 
-## simulation with different maximal within clade  pair-wise node distance 
+## simulation with different maximal within clade pair-wise node distances 
 
 ```{r, echo=FALSE,results='hide', warning=FALSE,message=FALSE}
 
@@ -282,7 +282,7 @@ ggplot(kor_simout,aes(x=kor_simout$X0.001,y=kor_simout$X366))+
 ```
 
 
-## I re-assign the clade with maximal pair-wise node distance 0.16 within clade
+## I re-assign the clades with maximal pair-wise node distance within clade as 0.16 subs/site
 ## Similar resultes from the clades defined in annotation files, only differences in KOR-A
 ### KOR-A was divided into two propotion with pair-wise node distance criteria (type1 and type 3)
 
@@ -342,5 +342,3 @@ p%<+% kor_tip +
   scale_color_brewer(palette = "Set3",name="kor annotation with pair-wise node distance") 
 ```
 
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
