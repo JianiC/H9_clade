@@ -1,0 +1,346 @@
+---
+title: "H9_G1_KOR_pairwise_nodedistance"
+author: "Jiani Chen"
+date: "9/9/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+list.of.packages <- c("ggplot2","ggtree","ape","dplyr","tidyr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+
+#library(treeio)
+library(ggplot2)
+library(ggtree)
+#library(phytools)
+library(ape)
+library(dplyr)
+#library(tidytree)
+#library('matrixStats')
+library(tidyr)
+#library(magrittr)
+```
+
+# G1 clades defined from annotation files
+
+```{r, warning=FALSE,echo=FALSE}
+G1<-read.tree(file="01_data/G1conOG.fas.treefile")
+
+p<-ggtree(G1)
+meta_G1<- read.table("01_data//G1_clade.txt", sep="\t", header=TRUE,check.names=FALSE, stringsAsFactor=F, fill=TRUE)
+
+p%<+% meta_G1 +
+  geom_tippoint(aes(color=clade), size=2, alpha=.75) +
+  geom_treescale(x=0.03, y=500,linesize= 1,,width=0.01)+
+  geom_text2(aes(label=label, subset=(node %in% c(1414,1828,2036,2084,2371,2389,2397,2527,2568,2694))),color="blue",size =3)+
+  geom_point2(aes(label=label, subset=(node %in% c(1414,1828,2036,2084,2371,2389,2397,2527,2568,2694))),color="blue",size =2)+
+  scale_color_brewer(palette = "Set3",name="G1 annotation") 
+```
+
+# With the assigned clade, calulate the maximal pair-wise node distance within clade
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+max_inclade<-function(tree,node){
+  clade<-extract.clade(tree,node)
+  clade_nodedis<-dist.nodes(clade)%>%
+    as.data.frame()
+  
+  clade_nodedis$node1 <-rownames(clade_nodedis)
+  
+  clade_nodedis2<-pivot_longer(clade_nodedis,cols=1:nrow(clade_nodedis),names_to="node2",values_to ="node_dist")
+  parentlist<-unique(as_tibble(clade)$parent)
+  as_tibble(clade)%>%
+    filter(as.numeric(label) >=70)->supp_node
+  nodeList<-supp_node$node  
+  clade_nodedis3 <-clade_nodedis2 %>% 
+    subset(node1 %in% nodeList) %>% subset(node2 %in% nodeList) %>%
+    subset(node1 %in% parentlist) %>% subset(node2 %in% parentlist)
+  return(max(clade_nodedis3$node_dist))
+  
+}
+
+
+data.frame("clade"=c("G1-A","G1-B","G1-C","G1-D","G1-E","G1-F","G1-G","G1-H","G1-I","G1-L"),
+           "max within-clade pair-nodedist"=c(max_inclade(G1,1414),max_inclade(G1,1828),
+                                              max_inclade(G1,2036),max_inclade(G1,2083),
+                                              max_inclade(G1,2371),max_inclade(G1,2389),
+                                              max_inclade(G1,2397),max_inclade(G1,2527),
+                                              max_inclade(G1,2568),max_inclade(G1,2694)))
+
+```
+
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE,results='hide', warning=FALSE,message=FALSE}
+## test to perform genotype assignment with node distance
+## simulation different cutoff value , number of cluster
+
+G1_nodedis<-dist.nodes(G1)%>%
+  as.data.frame()
+
+G1_nodedis$node1 <-rownames(G1_nodedis)
+G1_nodedis2<-pivot_longer(G1_nodedis,cols=1:2792,names_to="node2",values_to ="node_dist")
+
+as_tibble(G1)%>%
+  filter(as.numeric(label) >=70)->supp_node
+
+parentlist<-unique(as_tibble(G1)$parent)
+nodeList<-supp_node$node    
+G1_nodedis3 <-G1_nodedis2 %>% 
+  subset(node1 %in% nodeList) %>% subset(node2 %in% nodeList) %>%
+  subset(node1 %in% parentlist) %>% subset(node2 %in% parentlist) 
+
+G1_nodedis4 <- pivot_wider(G1_nodedis3, names_from = node2, values_from = node_dist)  
+
+rownames(G1_nodedis4)<-G1_nodedis4$node1
+G1_nodedis5<-G1_nodedis4 %>% 
+  select(-node1)%>%
+  as.dist()
+
+G1_simout<-data.frame(cutoff=double(),
+                       ngroup=integer())
+
+for (i in seq(0.001,0.2,by=0.001)){
+  hr <- hclust(G1_nodedis5, method = "complete", members=NULL)
+  myhcl <- cutree(hr, h=i)
+  out<-c(i,length(unique(myhcl)))
+  G1_simout <-rbind(G1_simout,out)
+  
+}
+
+ggplot(G1_simout,aes(x=G1_simout$X0.001,y=G1_simout$X807))+
+  geom_point()+
+  geom_smooth()+
+  theme_bw()+
+  xlab("Cut-off vlaue of max within clade pair-wise node distance")+
+  ylab("Number of clades to be assign")
+```
+
+## I re-assign the clade with maximal pair-wise node distance 0.16 within clade
+## Similar resultes from the clades defined in annotation file
+### G1-D clade, small propotion of sequences was unable to classified with this approach ( type 8, green) 
+
+
+```{r, echo=FALSE,warning=FALSE,results='hide'}
+
+map2color<-function(x,pal,limits=NULL){
+  if(is.null(limits)) limits=range(x)
+  pal[findInterval(x,seq(limits[1],limits[2],length.out=length(pal)+1), all.inside=TRUE)]
+} 
+hr <- hclust(G1_nodedis5, method = "complete", members=NULL)
+myhcl <- cutree(hr, h=0.16) ######### edit the cut-off 
+
+G1_sum<-data.frame()
+G1_nodename<-G1_nodedis4$node1 
+G1_sum<-cbind(myhcl)%>%as.data.frame()%>%
+  mutate(node=as.integer(G1_nodename))%>%
+  mutate(color=map2color(myhcl,rainbow(200)))
+
+nnode<-c()
+for(i in as.numeric(G1_sum$node)){
+  temp<-extract.clade(G1,i)
+  nnode<-c(nnode,temp$Nnode)
+  
+}
+
+G1_sum<-G1_sum%>%
+  mutate(nnode=nnode)%>%
+  group_by(myhcl) %>% 
+  filter(nnode == max(nnode)) 
+
+## get the tips from node
+G1_tip<-data.frame()
+G1_temp<-extract.clade(G1,1400)
+G1_temp2<-extract.clade(G1,1403)
+G1_temp3<-extract.clade(G1,1408)
+G1_temp4<-extract.clade(G1,1414)
+#G1_temp5<-extract.clade(G1,1812)
+G1_temp6<-extract.clade(G1,1829)
+G1_temp7<-extract.clade(G1,2036)
+G1_temp8<-extract.clade(G1,2086)
+G1_temp9<-extract.clade(G1,2372)
+G1_temp10<-extract.clade(G1,2390)
+G1_temp11<-extract.clade(G1,2399)
+G1_temp12<-extract.clade(G1,2694)
+
+G1_tip<-cbind(G1_temp$tip.label)%>%
+  as.data.frame()%>%
+  mutate(genotype="type1")%>%
+  mutate(genotype=ifelse(V1 %in% G1_temp2$tip.label,"type2",genotype)) %>%
+  mutate(genotype=ifelse(V1 %in% G1_temp3$tip.label,"type3",genotype)) %>%
+  mutate(genotype=ifelse(V1 %in% G1_temp4$tip.label,"type4",genotype)) %>%
+  #mutate(genotype=ifelse(V1 %in% G1_temp5$tip.label,"type5",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% G1_temp6$tip.label,"type5",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% G1_temp7$tip.label,"type6",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% G1_temp8$tip.label,"type7",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% G1_temp9$tip.label,"type8",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% G1_temp10$tip.label,"type9",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% G1_temp11$tip.label,"type10",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% G1_temp12$tip.label,"type11",genotype))
+colnames(G1_tip)<-c("taxa","genotype")
+
+
+p%<+% G1_tip +
+  geom_tippoint(aes(color=genotype), size=2, alpha=.75) +
+  geom_treescale(x=0.03, y=500,linesize= 1,,width=0.01)+
+  scale_color_brewer(palette = "Set3",name="G1 annotation with pair-wise node distance") 
+
+```
+# analysis for KOR clade
+# Kor clades defined from annotation files
+
+```{r, warning=FALSE,echo=FALSE}
+kor<-read.tree(file="01_data/tree-Korean-topology-with-outgroup-selection.nwk")
+
+p<-ggtree(kor)
+meta_kor<- read.table("01_data/Korean-Groups.txt", sep="\t", header=TRUE,check.names=FALSE, stringsAsFactor=F, fill=TRUE)
+
+p%<+% meta_kor +
+  geom_tippoint(aes(color=Group), size=2, alpha=.75) +
+  geom_treescale(x=0.03, y=500,linesize= 1,,width=0.01)+
+  geom_text2(aes(label=label, subset=(node %in% c(585,773,887,911,915,980,1097,1110))),color="blue",size =3)+
+  geom_point2(aes(label=label, subset=(node %in% c(585,773,887,911,915,980,1097,1110))),color="blue",size =2)+
+  scale_color_brewer(palette = "Set3",name="Kor annotation") 
+```
+
+# With the assigned clade, calulate the maximal pair-wise node distance within clade
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+max_inclade<-function(tree,node){
+  clade<-extract.clade(tree,node)
+  clade_nodedis<-dist.nodes(clade)%>%
+    as.data.frame()
+  
+  clade_nodedis$node1 <-rownames(clade_nodedis)
+  
+  clade_nodedis2<-pivot_longer(clade_nodedis,cols=1:nrow(clade_nodedis),names_to="node2",values_to ="node_dist")
+  parentlist<-unique(as_tibble(clade)$parent)
+  #as_tibble(clade)%>%
+   # filter(as.numeric(label) >=70)->supp_node
+  nodeList<-supp_node$node  
+  clade_nodedis3 <-clade_nodedis2 %>% 
+    #subset(node1 %in% nodeList) %>% subset(node2 %in% nodeList) %>%
+    subset(node1 %in% parentlist) %>% subset(node2 %in% parentlist)
+  return(max(clade_nodedis3$node_dist))
+  
+}
+
+data.frame("clade"=c("KOR-A","KOR-B","KOR-C","KOR-D","KOR-E","KOR-F","KOR-G","KOR-H"),
+            "max within-clade pair-nodedist"=c(max_inclade(kor,585),max_inclade(kor, 773),
+                                               max_inclade(kor,887),max_inclade(kor, 911),
+                                               max_inclade(kor,915),max_inclade(kor,980),
+                                               max_inclade(kor,1097),max_inclade(kor,1110)))
+```
+
+## simulation with different maximal within clade  pair-wise node distance 
+
+```{r, echo=FALSE,results='hide', warning=FALSE,message=FALSE}
+
+kor_nodedis<-dist.nodes(kor)%>%
+  as.data.frame()
+
+kor_nodedis$node1 <-rownames(kor_nodedis)
+kor_nodedis2<-pivot_longer(kor_nodedis,cols=1:1149,names_to="node2",values_to ="node_dist")
+
+
+
+parentlist<-unique(as_tibble(kor)$parent)
+nodeList<-supp_node$node    
+kor_nodedis3 <-kor_nodedis2 %>% 
+  #subset(node1 %in% nodeList) %>% subset(node2 %in% nodeList) %>%
+  subset(node1 %in% parentlist) %>% subset(node2 %in% parentlist) 
+
+kor_nodedis4 <- pivot_wider(kor_nodedis3, names_from = node2, values_from = node_dist)  
+
+rownames(kor_nodedis4)<-kor_nodedis4$node1
+kor_nodedis5<-kor_nodedis4 %>% 
+  select(-node1)%>%
+  as.dist()
+
+kor_simout<-data.frame(cutoff=double(),
+                       ngroup=integer())
+
+for (i in seq(0.001,0.2,by=0.001)){
+  hr <- hclust(kor_nodedis5, method = "complete", members=NULL)
+  myhcl <- cutree(hr, h=i)
+  out<-c(i,length(unique(myhcl)))
+  kor_simout <-rbind(kor_simout,out)
+  
+}
+
+ggplot(kor_simout,aes(x=kor_simout$X0.001,y=kor_simout$X366))+
+  geom_point()+
+  geom_smooth()+
+  theme_bw()+
+  xlab("Cut-off vlaue of max within clade pair-wise node distance")+
+  ylab("Number of clades to be assign")
+```
+
+
+## I re-assign the clade with maximal pair-wise node distance 0.16 within clade
+## Similar resultes from the clades defined in annotation files, only differences in KOR-A
+### KOR-A was divided into two propotion with pair-wise node distance criteria (type1 and type 3)
+
+
+```{r, warning=FALSE,echo=FALSE}
+hr <- hclust(kor_nodedis5, method = "complete", members=NULL)
+myhcl <- cutree(hr, h=0.16)
+
+kor_sum<-data.frame()
+kor_nodename<-kor_nodedis4$node1 
+kor_sum<-cbind(myhcl)%>%as.data.frame()%>%
+  mutate(node=as.integer(kor_nodename))%>%
+  mutate(color=map2color(myhcl,rainbow(200)))
+
+nnode<-c()
+for(i in as.numeric(kor_sum$node)){
+  temp<-extract.clade(kor,i)
+  nnode<-c(nnode,temp$Nnode)
+  
+}
+
+kor_sum<-kor_sum%>%
+  mutate(nnode=nnode)%>%
+  group_by(myhcl) %>% 
+  filter(nnode == max(nnode)) 
+
+## get the tips from node
+kor_tip<-data.frame()
+kor_temp<-extract.clade(kor,576)
+kor_temp2<-extract.clade(kor,582)
+kor_temp3<-extract.clade(kor,585)
+kor_temp4<-extract.clade(kor,592)
+kor_temp5<-extract.clade(kor,911)
+kor_temp6<-extract.clade(kor,915)
+kor_temp7<-extract.clade(kor,980)
+kor_temp8<-extract.clade(kor,1097)
+kor_temp9<-extract.clade(kor,1110)
+
+
+kor_tip<-cbind(kor_temp$tip.label)%>%
+  as.data.frame()%>%
+  mutate(genotype="type1")%>%
+  mutate(genotype=ifelse(V1 %in% kor_temp2$tip.label,"type2",genotype)) %>%
+  mutate(genotype=ifelse(V1 %in% kor_temp3$tip.label,"type3",genotype)) %>%
+  mutate(genotype=ifelse(V1 %in% kor_temp4$tip.label,"type4",genotype)) %>%
+  mutate(genotype=ifelse(V1 %in% kor_temp5$tip.label,"type5",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% kor_temp6$tip.label,"type6",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% kor_temp7$tip.label,"type7",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% kor_temp8$tip.label,"type8",genotype))%>%
+  mutate(genotype=ifelse(V1 %in% kor_temp9$tip.label,"type9",genotype))
+
+colnames(kor_tip)<-c("taxa","genotype")
+
+p%<+% kor_tip +
+  geom_tippoint(aes(color=genotype), size=2, alpha=.75) +
+  geom_treescale(x=0.03, y=500,linesize= 1,,width=0.01)+
+  scale_color_brewer(palette = "Set3",name="kor annotation with pair-wise node distance") 
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
