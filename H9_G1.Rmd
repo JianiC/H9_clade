@@ -36,6 +36,7 @@ meta_G1<- read.table("01_data//G1_clade.txt", sep="\t", header=TRUE,check.names=
 p%<+% meta_G1 +
   geom_tippoint(aes(color=clade), size=2, alpha=.75) +
   geom_treescale(x=0.03, y=500,linesize= 1,,width=0.01)+
+##  geom_text2(aes(label=label),color="blue",size =3)+ ## this is used to list the node number
   geom_text2(aes(label=label, subset=(node %in% c(1414,1828,2036,2084,2371,2389,2397,2527,2568,2694))),color="blue",size =3)+
   geom_point2(aes(label=label, subset=(node %in% c(1414,1828,2036,2084,2371,2389,2397,2527,2568,2694))),color="blue",size =2)+
   scale_color_brewer(palette = "Set3",name="G1 annotation") 
